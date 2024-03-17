@@ -20,6 +20,7 @@ namespace CelesteDash
         private static float maxDashSpeed;
         private static bool isDashJumpExtended;
         private static float recoilSpeed;
+        public static string NO_SHADOW_DASH_BUTTON = "left shift";
         public static float BtF(bool x)
         {
             if (x) { return 1f;  }
@@ -63,6 +64,7 @@ namespace CelesteDash
             isDashJumpExtended = true;
             maxDashSpeed = 0;
             recoilSpeed = 20f;
+            NO_SHADOW_DASH_BUTTON = "left shift";
             // put additional initialization logic here
 
             Log("Initialized");
@@ -229,7 +231,12 @@ namespace CelesteDash
             }
             ///TODO: charm 16
             maxDashSpeed = HeroControllerR.DASH_SPEED;
-            if ((HeroControllerR.playerData.GetBool("equippedCharm_16")))
+            
+            if (Input.GetKey(NO_SHADOW_DASH_BUTTON) && (HeroControllerR.playerData.GetBool("equippedCharm_31"))) // dashmaster allows use regular dash
+            {
+                HeroControllerR.shadowDashTimer = 0.001f;
+            }
+            else if ((HeroControllerR.playerData.GetBool("equippedCharm_16")) && (HeroControllerR.shadowDashTimer < 0.001f))
             {
                 maxDashSpeed = HeroControllerR.DASH_SPEED_SHARP;
             }
