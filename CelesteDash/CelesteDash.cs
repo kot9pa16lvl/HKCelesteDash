@@ -257,7 +257,7 @@ namespace CelesteDash
                     lastVel.x = maxDashSpeed * Math.Sign(dashDir.x) * 1.2f;
                     lastVel.y = 0f;
                     inHyper = true;
-                } else if (dashDir.y < -0.001f) /// intended ultra
+                } else if ((dashDir.y < -0.001f) && (Math.Abs(lastVel.x > maxDashSpeed - 0.001f)) /// intended ultra
                 {
                     lastVel.x = lastVel.x * 1.2f;
                     lastVel.y = 0f;
