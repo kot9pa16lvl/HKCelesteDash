@@ -229,6 +229,10 @@ namespace CelesteDash
             }
             ///TODO: charm 16
             maxDashSpeed = HeroControllerR.DASH_SPEED;
+            if ((HeroControllerR.playerData.GetBool("equippedCharm_16")))
+            {
+                maxDashSpeed = HeroControllerR.DASH_SPEED_SHARP;
+            }
             float dashSpeedx = Math.Max(maxDashSpeed, Math.Abs(HeroControllerR.current_velocity.x));
             float dashSpeedy = maxDashSpeed;
             if ((dashDir.y < -0.001f)) //&& (maxDashSpeed < Math.Abs(HeroControllerR.current_velocity.x)))
@@ -257,7 +261,7 @@ namespace CelesteDash
                     lastVel.x = maxDashSpeed * Math.Sign(dashDir.x) * 1.2f;
                     lastVel.y = 0f;
                     inHyper = true;
-                } else if ((dashDir.y < -0.001f) && (Math.Abs(lastVel.x > maxDashSpeed - 0.001f)) /// intended ultra
+                } else if ((dashDir.y < -0.001f) && (Math.Abs(lastVel.x) > maxDashSpeed - 0.001f)) /// intended ultra
                 {
                     lastVel.x = lastVel.x * 1.2f;
                     lastVel.y = 0f;
