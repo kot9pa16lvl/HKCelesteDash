@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Timeline;
 using System.Diagnostics.Eventing.Reader;
 using System.Collections.ObjectModel;
+using System.EnterpriseServices;
 
 namespace CelesteDash
 {
@@ -21,6 +22,7 @@ namespace CelesteDash
         private static bool isDashJumpExtended;
         private static float recoilSpeed;
         public static string NO_SHADOW_DASH_BUTTON = "left shift";
+        private const float EPS = 0.001f;
         public static float BtF(bool x)
         {
             if (x) { return 1f;  }
@@ -130,6 +132,15 @@ namespace CelesteDash
 
         private void CDash(On.HeroController.orig_Dash orig, HeroController self)
         {
+            if (HeroControllerR.dash_timer < EPS) // first time entering dash
+            {
+                float dashAngle = Vector2.SignedAngle(dashDir, new Vector2(1f, 0f));
+                Vector2 particleDashDir = -dashDir.normalized * 3.74f;
+                HeroControllerR.dashBurst.transform.localPosition = new Vector3(Math.Abs(particleDashDir.x), particleDashDir.y, 0.01f);
+                //HeroControllerR.dashBurst.transform.localPosition = new Vector3(-0.07f, 3.74f, 0.01f);
+                if (dashDir.x < EPS) { dashAngle = 180f - dashAngle; }
+                HeroControllerR.dashBurst.transform.localEulerAngles = new Vector3(0f, 0f, dashAngle);
+            }
             groundFrames = 0;
             dashFrames++;
             HeroControllerR.AffectedByGravity(gravityApplies: false);
