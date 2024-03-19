@@ -177,7 +177,11 @@ namespace CelesteDash
         private void CelesteMove(On.HeroController.orig_Move orig, HeroController self, float move_direction)
         {
             ///TODO: set grounded actor state
-            orig(self, move_direction); /// temp replace for grounded state
+            if (HeroControllerR.cState.onGround)
+            {
+                HeroControllerR.SetState(GlobalEnums.ActorStates.grounded);
+            }
+            //orig(self, move_direction);/// temp replace for grounded state
             if (!HeroControllerR.acceptingInput || HeroControllerR.cState.wallSliding) { return; }
             if (HeroControllerR.cState.inWalkZone) {
                 HeroControllerR.current_velocity = new Vector2(move_direction * HeroControllerR.WALK_SPEED, HeroControllerR.current_velocity.y);
@@ -191,7 +195,7 @@ namespace CelesteDash
             if (HeroControllerR.cState.onGround) {// ground friction
                 groundFrames += 1;
                 if (groundFrames > 3)
-                {
+                { /// TODO: make an option to apply friction anyway if not after diagonal dash or right after normal dash
                     new_velocity = new Vector2(new_velocity.x * groundFriction, HeroControllerR.current_velocity.y);
                 }
             } else 
@@ -214,6 +218,7 @@ namespace CelesteDash
             { // resisting movement
                 new_velocity = new Vector2(new_velocity.x + move_direction * maxRunSpeed, HeroControllerR.current_velocity.y);
             }
+            ///TODO: exceed Run speed only if doing a tech aka allowExceedSpeed
             HeroControllerR.rb2d.velocity = new_velocity;
             
         }
@@ -223,6 +228,7 @@ namespace CelesteDash
 
             if (!orig(self)) { return false; }
             if ((!HeroControllerR.cState.onGround) && (!isDashJumpExtended)) { return false; }
+            /// TODO: make sprite flip from hero dash there
             dashFrames = 0;
             //lastDirectionBeforeDash = 
             dashDir.x = BtF(HeroControllerR.inputHandler.inputActions.right.IsPressed)
