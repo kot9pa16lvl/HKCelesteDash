@@ -188,6 +188,12 @@ namespace CelesteDash
             }
             ///TODO: charm 31, 37
             float maxRunSpeed = HeroControllerR.RUN_SPEED;
+            if (HeroControllerR.cState.inAcid) { maxRunSpeed = HeroControllerR.UNDERWATER_SPEED; }
+            else if (HeroControllerR.playerData.GetBool("equippedCharm_37") &&
+                HeroControllerR.playerData.GetBool("equippedCharm_31") && HeroControllerR.cState.onGround)
+                    { maxRunSpeed = HeroControllerR.RUN_SPEED_CH_COMBO; }
+            else if (HeroControllerR.playerData.GetBool("equippedCharm_37") && HeroControllerR.cState.onGround)
+                    { maxRunSpeed = HeroControllerR.RUN_SPEED_CH; }
             float stoppingSpeed = 2f;
             float groundFriction = 0.8f;
             Vector2 new_velocity = HeroControllerR.current_velocity;
