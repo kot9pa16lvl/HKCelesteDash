@@ -7,10 +7,15 @@ using UnityEngine.Timeline;
 using System.Diagnostics.Eventing.Reader;
 using System.Collections.ObjectModel;
 using System.EnterpriseServices;
+using System.Collections.Generic;
+using System.Xml.Linq;
+using Satchel;
+using Satchel.BetterMenus;
+
 
 namespace CelesteDash
 {
-    public class CelesteDashMod : Mod
+    public class CelesteDashMod : Mod, ICustomMenuMod
     {
         private static CelesteDashMod? _instance;
         private static Vector2 dashDir;
@@ -22,7 +27,55 @@ namespace CelesteDash
         private static bool isDashJumpExtended;
         private static float recoilSpeed;
         public static string NO_SHADOW_DASH_BUTTON = "left shift";
+        private bool slashBoostOption = true;
+        private bool allowBunnyHopOption;
+        private bool canExceedSpeed = false;
         private const float EPS = 0.001f;
+        private const float RECOILSPEED = 20f;
+
+        private Menu MenuRef;
+        public MenuScreen GetMenuScreen(MenuScreen modListMenu, ModToggleDelegates? modtoggledelegates)
+        {
+            //Create a new MenuRef if it's not null
+            MenuRef ??= new Menu(
+                        name: "Celeste Dash Menu", //the title of the menu screen, it will appear on the top center of the screen 
+                        elements: new Element[]
+                        {
+                            Blueprints.HorizontalBoolOption(
+                                name: "Slash boost",
+                                description: "allows to get speed when pogo a wall",
+                                applySetting: (v) =>
+                                {
+                                    slashBoostOption = v;
+                                    if (v) {recoilSpeed = RECOILSPEED; }
+                                    else {recoilSpeed = 0f; }
+                                },
+                                loadSetting: () =>
+                                {
+                                    if (slashBoostOption) {recoilSpeed = RECOILSPEED; }
+                                    else {recoilSpeed = 0f; }
+                                    return slashBoostOption;
+                                }),
+                            Blueprints.HorizontalBoolOption(
+                                name: "Bunnyhop",
+                                description: "Don't loss speed if jumping repeatedly",
+                                applySetting: (v) =>
+                                {
+                                    allowBunnyHopOption = v;
+                                },
+                                loadSetting: () =>
+                                {
+                                    return allowBunnyHopOption;
+                                })
+                        }
+            );
+
+            //uses the GetMenuScreen function to return a menuscreen that MAPI can use. 
+            //The "modlistmenu" that is passed into the parameter can be any menuScreen that you want to return to when "Back" button or "esc" key is pressed 
+            return MenuRef.GetMenuScreen(modListMenu);
+        }
+        public bool ToggleButtonInsideMenu { get; }
+
         public static float BtF(bool x)
         {
             if (x) { return 1f;  }
@@ -65,7 +118,7 @@ namespace CelesteDash
             dashFrames = 0;
             isDashJumpExtended = true;
             maxDashSpeed = 0;
-            recoilSpeed = 20f;
+            recoilSpeed = RECOILSPEED;
             NO_SHADOW_DASH_BUTTON = "left shift";
             // put additional initialization logic here
 
@@ -91,13 +144,14 @@ namespace CelesteDash
 
         private void CUpdate()
         {
-            
             if ((HeroControllerR.cState.recoilingLeft))
             {
+                if (slashBoostOption) { canExceedSpeed = true; }
                 HeroControllerR.rb2d.velocity = new Vector2(-recoilSpeed, HeroControllerR.rb2d.velocity.y);//recoilSpeed;
             }
             if (HeroControllerR.cState.recoilingRight)
             {
+                if (slashBoostOption) { canExceedSpeed = true; }
                 HeroControllerR.rb2d.velocity = new Vector2(recoilSpeed, HeroControllerR.rb2d.velocity.y);
             }
             if (HeroControllerR.cState.onGround && (HeroControllerR.dashCooldownTimer <= 0f))
@@ -206,7 +260,8 @@ namespace CelesteDash
                 }
             } else 
             { //air friction
-                groundFrames = 0;
+                if (allowBunnyHopOption) { groundFrames = 0; }
+                else { groundFrames = 3; }
             }
             if (Math.Abs(HeroControllerR.current_velocity.x) < stoppingSpeed)
             {
@@ -225,8 +280,15 @@ namespace CelesteDash
                 new_velocity = new Vector2(new_velocity.x + move_direction * maxRunSpeed, HeroControllerR.current_velocity.y);
             }
             ///TODO: exceed Run speed only if doing a tech aka allowExceedSpeed
+            if (Math.Abs(new_velocity.x) < maxRunSpeed + EPS) { canExceedSpeed = false; }
+            if (canExceedSpeed)
+            {
+                HeroControllerR.rb2d.velocity = new_velocity;
+                return;
+            }
+            if (new_velocity.x < -maxRunSpeed) { new_velocity.x = -maxRunSpeed; }
+            if (new_velocity.x > maxRunSpeed) { new_velocity.x = maxRunSpeed; }
             HeroControllerR.rb2d.velocity = new_velocity;
-            
         }
 
         private bool CanDash8Dir(On.HeroController.orig_CanDash orig, HeroController self)
@@ -270,6 +332,7 @@ namespace CelesteDash
                 dashSpeedy = Math.Max(Math.Abs(HeroControllerR.current_velocity.x), maxDashSpeed) * (float)Math.Sqrt(2);
                 //dashSpeedy = (HeroControllerR.current_velocity.x) * (float)Math.Sqrt(2);
                 dashSpeedx = dashSpeedx * (float)Math.Sqrt(2);
+                canExceedSpeed = true;
             }
             dashDir.x *= dashSpeedx;
             dashDir.y *= dashSpeedy;
@@ -301,6 +364,7 @@ namespace CelesteDash
                 {
                     isDashJumpExtended = false;
                 }
+                canExceedSpeed = true;
                 HeroControllerR.FinishedDashing();
                 dashDir = new Vector2(0f, 0f); ///intended ultra
                 HeroControllerR.rb2d.velocity = lastVel;
