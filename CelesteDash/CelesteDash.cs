@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Xml.Linq;
 using Satchel;
 using Satchel.BetterMenus;
+using System.Diagnostics;
 
 
 namespace CelesteDash
@@ -27,11 +28,14 @@ namespace CelesteDash
         private static bool isDashJumpExtended;
         private static float recoilSpeed;
         public static string NO_SHADOW_DASH_BUTTON = "left shift";
+        private bool isWallbouncing = false;
         private bool slashBoostOption = true;
         private bool allowBunnyHopOption;
         private bool canExceedSpeed = false;
         private const float EPS = 0.001f;
         private const float RECOILSPEED = 20f;
+        private const float WALLBOUCEDIST = 1f;
+        private const float MIDAIRDASHDIST = 0.35f;
 
         private Menu MenuRef;
         public MenuScreen GetMenuScreen(MenuScreen modListMenu, ModToggleDelegates? modtoggledelegates)
@@ -111,7 +115,8 @@ namespace CelesteDash
             On.HeroController.Jump += CJump;
             //On.HeroController.CancelRecoilHorizontal += CCancelRecoulHz;
             ModHooks.HeroUpdateHook += CUpdate;
-
+            On.HeroController.CanWallJump += CCanWallJump;
+            On.HeroController.CancelJump += CCancelJump;
             inHyper = false;
             dashDir = Vector2.zero;
             groundFrames = 0;
@@ -121,26 +126,104 @@ namespace CelesteDash
             recoilSpeed = RECOILSPEED;
             NO_SHADOW_DASH_BUTTON = "left shift";
             // put additional initialization logic here
-
             Log("Initialized");
         }
+
+
+
+
+
         /*
-        private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig, HeroController self)
+private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig, HeroController self)
+{
+   if (HeroControllerR.cState.recoilingLeft)
+   {
+       HeroControllerR.cState.recoilingLeft = false;
+       HeroControllerR.rb2d.velocity = new Vector2(-recoilSpeed, HeroControllerR.rb2d.velocity.y);
+   }
+   if (HeroControllerR.cState.recoilingRight)
+   {
+       HeroControllerR.cState.recoilingRight = false;
+       HeroControllerR.rb2d.velocity = new Vector2(recoilSpeed, HeroControllerR.rb2d.velocity.y);
+   }
+   HeroControllerR.cState.recoilingLeft = false;
+   HeroControllerR.cState.recoilingRight = false;
+   HeroControllerR.recoilSteps = 0;
+}*/
+        char canWallbounce()
         {
-            if (HeroControllerR.cState.recoilingLeft)
+            Bounds heroBounds = HeroControllerR.col2d.bounds;
+            for (int step = 0; step < 4; step++)
             {
-                HeroControllerR.cState.recoilingLeft = false;
-                HeroControllerR.rb2d.velocity = new Vector2(-recoilSpeed, HeroControllerR.rb2d.velocity.y);
+                float curY = heroBounds.min.y + (heroBounds.max.y - heroBounds.min.y) * (step / 3f);
+                Vector2 leftPos = new Vector2(heroBounds.min.x, curY);
+                Vector2 rightPos = new Vector2(heroBounds.max.x, curY);
+                UnityEngine.RaycastHit2D leftBounce = Physics2D.Raycast(leftPos, Vector2.left, WALLBOUCEDIST, 256);
+                UnityEngine.RaycastHit2D rightBounce = Physics2D.Raycast(rightPos, Vector2.right, WALLBOUCEDIST, 256);
+                if ((leftBounce.collider != null) && (leftBounce.collider.gameObject.GetComponent<NonSlider>() == null))
+                {
+                    return 'L';
+                }
+                if ((rightBounce.collider != null) && (rightBounce.collider.gameObject.GetComponent<NonSlider>() == null))
+                {
+                    return 'R';
+                }
             }
-            if (HeroControllerR.cState.recoilingRight)
+            return 'N';
+        }
+
+        bool IsCloseToGround()
+        {
+            Bounds heroBounds = HeroControllerR.col2d.bounds;
+            for (int step = 0; step < 4; step++)
             {
-                HeroControllerR.cState.recoilingRight = false;
-                HeroControllerR.rb2d.velocity = new Vector2(recoilSpeed, HeroControllerR.rb2d.velocity.y);
+                float curX = heroBounds.min.x + (heroBounds.max.x - heroBounds.min.x) * (step / 3f);
+                Vector2 curPos = new Vector2(curX, heroBounds.min.y);
+                UnityEngine.RaycastHit2D downCollision = Physics2D.Raycast(curPos, Vector2.down, WALLBOUCEDIST, 256);
+                if ((downCollision.collider != null) && (downCollision.collider.gameObject.GetComponent<NonSlider>() == null))
+                {
+                    return true;
+                }
             }
-            HeroControllerR.cState.recoilingLeft = false;
-            HeroControllerR.cState.recoilingRight = false;
-            HeroControllerR.recoilSteps = 0;
-        }*/
+            return false;
+        }
+        private bool CCanWallJump(On.HeroController.orig_CanWallJump orig, HeroController self)
+        {
+            if (!HeroControllerR.playerData.GetBool("hasWalljump")) { return false; }
+            if (HeroControllerR.cState.touchingNonSlider)
+            {
+                return false;
+            }
+            if (HeroControllerR.cState.wallSliding)
+            {
+                return true;
+            }
+
+            if (HeroControllerR.cState.dashing && dashDir.y > EPS && Math.Abs(dashDir.x) < EPS) // dashing up
+            {
+                char wallbounceDir = canWallbounce();
+                if (wallbounceDir == 'N') { return false; }
+                if (wallbounceDir == 'L')
+                {
+                    HeroControllerR.touchingWallL = true;
+                    isWallbouncing = true;
+                    HeroControllerR.FinishedDashing();
+                    return true;
+                }
+                if (wallbounceDir == 'R')
+                {
+                    HeroControllerR.touchingWallR = true;
+                    isWallbouncing = true;
+                    HeroControllerR.FinishedDashing();
+                    return true;
+                }
+            }
+            if (HeroControllerR.cState.touchingWall && !HeroControllerR.cState.onGround)
+            {
+                return true;
+            }
+            return false;
+        }
 
         private void CUpdate()
         {
@@ -156,12 +239,18 @@ namespace CelesteDash
                 if (slashBoostOption) { canExceedSpeed = true; }
                 HeroControllerR.rb2d.velocity = new Vector2(recoilSpeed, HeroControllerR.rb2d.velocity.y);
             } 
-            if (HeroControllerR.cState.onGround && (HeroControllerR.dashCooldownTimer <= 0f)) ///refill on wallslide
+            if ((HeroControllerR.cState.onGround || HeroControllerR.cState.wallSliding || HeroControllerR.cState.inAcid) && (HeroControllerR.dashCooldownTimer <= 0f)) ///refill on wallslide
             {
                 isDashJumpExtended = true;
             }
         }
-
+        private void CCancelJump(On.HeroController.orig_CancelJump orig, HeroController self)
+        {
+            HeroControllerR.cState.jumping = false;
+            HeroControllerR.jumpReleaseQueuing = false;
+            HeroControllerR.jump_steps = 0;
+            isWallbouncing = false;
+        }
         private void CJump(On.HeroController.orig_Jump orig, HeroController self)
         {
             if (HeroControllerR.jump_steps == 0)
@@ -180,7 +269,23 @@ namespace CelesteDash
                 HeroControllerR.CancelJump();
                 return;
             }
-            HeroControllerR.rb2d.velocity = new Vector2(HeroControllerR.rb2d.velocity.x, HeroControllerR.JUMP_SPEED);
+            Vector2 lastVel = HeroControllerR.rb2d.velocity;
+            float newVelY = HeroControllerR.JUMP_SPEED;
+            if (isWallbouncing)
+            {
+                if (HeroControllerR.jump_steps == 0)  // first time entered wallbounce
+                    { newVelY = dashDir.y; }
+                else 
+                    { newVelY = Math.Max(newVelY, lastVel.y - Time.deltaTime * HeroControllerR.rb2d.gravityScale / 2); }
+                
+            }
+            HeroControllerR.rb2d.velocity = new Vector2(lastVel.x, newVelY);
+            /*
+            if (!isWallbouncing)
+                { HeroControllerR.rb2d.velocity = new Vector2(HeroControllerR.rb2d.velocity.x, HeroControllerR.JUMP_SPEED); }
+            else 
+                { HeroControllerR.rb2d.velocity = new Vector2(HeroControllerR.rb2d.velocity.x, dashDir.y); }
+            */
             HeroControllerR.jump_steps++;
             HeroControllerR.jumped_steps++;
             HeroControllerR.ledgeBufferSteps = 0;
@@ -360,7 +465,8 @@ namespace CelesteDash
             if (HeroControllerR.cState.jumping) { return false; }
             if (HeroControllerR.cState.bouncing) { return false; }
             if (HeroControllerR.cState.shroomBouncing) { return false; }
-            if (HeroControllerR.cState.onGround) {
+            if ((HeroControllerR.cState.onGround) ||
+               (HeroControllerR.cState.dashing && (Math.Abs(dashDir.y) < EPS) && (IsCloseToGround())) ) {
                 Vector2 lastVel = HeroControllerR.rb2d.velocity;
                 //HeroControllerR.current_velocity = Vector2(10, 0);
                 if ((dashDir.y < -0.001f) && (HeroControllerR.cState.dashing))
@@ -384,6 +490,7 @@ namespace CelesteDash
                 HeroControllerR.rb2d.velocity = lastVel;
                 return true; 
             }
+
             return orig(self);
             
         }
