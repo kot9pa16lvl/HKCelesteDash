@@ -144,6 +144,8 @@ namespace CelesteDash
 
         private void CUpdate()
         {
+
+            
             if ((HeroControllerR.cState.recoilingLeft))
             {
                 if (slashBoostOption) { canExceedSpeed = true; }
@@ -153,8 +155,8 @@ namespace CelesteDash
             {
                 if (slashBoostOption) { canExceedSpeed = true; }
                 HeroControllerR.rb2d.velocity = new Vector2(recoilSpeed, HeroControllerR.rb2d.velocity.y);
-            }
-            if (HeroControllerR.cState.onGround && (HeroControllerR.dashCooldownTimer <= 0f))
+            } 
+            if (HeroControllerR.cState.onGround && (HeroControllerR.dashCooldownTimer <= 0f)) ///refill on wallslide
             {
                 isDashJumpExtended = true;
             }
@@ -194,6 +196,8 @@ namespace CelesteDash
                 //HeroControllerR.dashBurst.transform.localPosition = new Vector3(-0.07f, 3.74f, 0.01f);
                 if (dashDir.x < EPS) { dashAngle = 180f - dashAngle; }
                 HeroControllerR.dashBurst.transform.localEulerAngles = new Vector3(0f, 0f, dashAngle);
+
+                if (dashDir.y > EPS) { HeroControllerR.airDashed = true; }
             }
             groundFrames = 0;
             dashFrames++;
@@ -216,12 +220,22 @@ namespace CelesteDash
                 //dashDir = Vector2.zero; intended ultra
                 return;
             }
-            HeroControllerR.rb2d.velocity = dashDir;
+
+            if ((HeroControllerR.dash_timer < EPS) || (dashDir.y > EPS)) // first time entering dash
+                { HeroControllerR.rb2d.velocity = dashDir; }
+            if ((!HeroControllerR.cState.onGround) && (dashDir.y < -EPS) && (Math.Abs(HeroControllerR.rb2d.velocity.y) < EPS)) //diagonal dash hit ground and left it
+            {
+                Vector2 lastVel = HeroControllerR.rb2d.velocity;
+                HeroControllerR.FinishedDashing();
+                HeroControllerR.rb2d.velocity = lastVel;
+                return;
+            }
             if (HeroControllerR.cState.onGround)
             {
                 isDashJumpExtended = true;
                 if (dashDir.y < -0.001f)
                 {
+
                     HeroControllerR.rb2d.velocity = new Vector2(dashDir.x, 0f);// * (float)Math.Sqrt(2), 0f);
                 }
             }
