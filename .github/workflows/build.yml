@@ -29,7 +29,7 @@ jobs:
         uses: BadMagic100/setup-hk@v1
         with:
           apiPath: API
-          #dependencyFilePath: CelesteDash/ModDependencies.txt
+          dependencyFilePath: CelesteDash/ModDependencies.txt
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
