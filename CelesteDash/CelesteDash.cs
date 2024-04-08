@@ -480,9 +480,18 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
                     lastVel.y = 0f;
                     inHyper = true;
                 }
+                if (Math.Abs(dashDir.y) < EPS)
+                {
+                    lastVel.x = maxDashSpeed * Math.Sign(dashDir.x);
+                }
                 if ((HeroControllerR.cState.dashing) && (dashFrames < 8))
                 {
                     isDashJumpExtended = false;
+                } else if (HeroControllerR.cState.dashing)
+                {
+                    HeroControllerR.airDashed = false;
+                    PlayerDataAccess.canDash = true;
+                    HeroControllerR.doubleJumped = false;
                 }
                 canExceedSpeed = true;
                 HeroControllerR.FinishedDashing();
