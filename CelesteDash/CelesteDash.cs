@@ -305,21 +305,27 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
         {
             if (HeroControllerR.dash_timer < EPS) // first time entering dash
             {
+                if ((dashDir.x > EPS) && (!HeroControllerR.cState.facingRight)) { HeroControllerR.FaceRight(); }
+                if ((dashDir.x < -EPS) && (HeroControllerR.cState.facingRight)) { HeroControllerR.FaceLeft(); }
                 float dashAngle = Vector2.SignedAngle(dashDir, new Vector2(1f, 0f));
                 float shadowDashAngle = dashAngle;
                 Vector2 particleDashDir = -dashDir.normalized * 3.74f;
+                Vector2 particleShadowDashDir = -dashDir.normalized * 5.21f;
                 if (dashDir.y > EPS) { particleDashDir.y -= 1f;  }
                 HeroControllerR.dashBurst.transform.localPosition = new Vector3(Math.Abs(particleDashDir.x), particleDashDir.y, 0.01f);
                 //HeroControllerR.dashBurst.transform.localPosition = new Vector3(-0.07f, 3.74f, 0.01f);
 
                 if (dashDir.x < EPS) { dashAngle = 180f - dashAngle; }
                 if (dashDir.x < -EPS) { shadowDashAngle = 180 - shadowDashAngle; }
+                if ( (HeroControllerR.cState.facingRight) && !((dashDir.y < -EPS) && (Math.Abs(dashDir.x) < EPS)) )
+                    { shadowDashAngle = -shadowDashAngle; }
                 HeroControllerR.dashBurst.transform.localEulerAngles = new Vector3(0f, 0f, dashAngle);
                 //if (shadowDashAngle.y < EPS) { shadowDashAngle += 360f;  }
-                //if (HeroControllerR.cState.shadowDashing)
-                //{
-                //    HeroControllerR.dashEffect.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
-                //}
+                if (HeroControllerR.cState.shadowDashing)
+                {
+                    HeroControllerR.dashEffect.transform.localEulerAngles = new Vector3(0f, 0f, shadowDashAngle);
+                    HeroControllerR.dashEffect.transform.localPosition = new Vector3(particleShadowDashDir.x, particleShadowDashDir.y, 0.01f) + HeroControllerR.rb2d.transform.position;
+                }
 
                 if (dashDir.y > EPS) { HeroControllerR.airDashed = true; }
             }
