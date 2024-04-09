@@ -28,6 +28,7 @@ namespace CelesteDash
         private static bool isDashJumpExtended;
         private static float recoilSpeed;
         public static string NO_SHADOW_DASH_BUTTON = "left shift";
+        private static bool contactedGroundDuringDash = false;
         private bool isWallbouncing = false;
         private bool slashBoostOption = true;
         private bool allowBunnyHopOption;
@@ -117,6 +118,7 @@ namespace CelesteDash
             ModHooks.HeroUpdateHook += CUpdate;
             On.HeroController.CanWallJump += CCanWallJump;
             On.HeroController.CancelJump += CCancelJump;
+            On.HeroController.CancelDash += CCancelDash;
             inHyper = false;
             dashDir = Vector2.zero;
             groundFrames = 0;
@@ -128,6 +130,8 @@ namespace CelesteDash
             // put additional initialization logic here
             Log("Initialized");
         }
+
+
 
 
 
@@ -251,6 +255,12 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
             HeroControllerR.jump_steps = 0;
             isWallbouncing = false;
         }
+
+        private void CCancelDash(On.HeroController.orig_CancelDash orig, HeroController self)
+        {
+            HeroControllerR.dashBurst.SendEvent("CANCEL");
+            orig(self);
+        } 
         private void CJump(On.HeroController.orig_Jump orig, HeroController self)
         {
             if (HeroControllerR.jump_steps == 0)
@@ -296,11 +306,20 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
             if (HeroControllerR.dash_timer < EPS) // first time entering dash
             {
                 float dashAngle = Vector2.SignedAngle(dashDir, new Vector2(1f, 0f));
+                float shadowDashAngle = dashAngle;
                 Vector2 particleDashDir = -dashDir.normalized * 3.74f;
+                if (dashDir.y > EPS) { particleDashDir.y -= 1f;  }
                 HeroControllerR.dashBurst.transform.localPosition = new Vector3(Math.Abs(particleDashDir.x), particleDashDir.y, 0.01f);
                 //HeroControllerR.dashBurst.transform.localPosition = new Vector3(-0.07f, 3.74f, 0.01f);
+
                 if (dashDir.x < EPS) { dashAngle = 180f - dashAngle; }
+                if (dashDir.x < -EPS) { shadowDashAngle = 180 - shadowDashAngle; }
                 HeroControllerR.dashBurst.transform.localEulerAngles = new Vector3(0f, 0f, dashAngle);
+                //if (shadowDashAngle.y < EPS) { shadowDashAngle += 360f;  }
+                //if (HeroControllerR.cState.shadowDashing)
+                //{
+                //    HeroControllerR.dashEffect.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
+                //}
 
                 if (dashDir.y > EPS) { HeroControllerR.airDashed = true; }
             }
@@ -326,21 +345,27 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
                 return;
             }
 
-            if ((HeroControllerR.dash_timer < EPS) || (dashDir.y > EPS)) // first time entering dash
-                { HeroControllerR.rb2d.velocity = dashDir; }
-            if ((!HeroControllerR.cState.onGround) && (dashDir.y < -EPS) && (Math.Abs(HeroControllerR.rb2d.velocity.y) < EPS)) //diagonal dash hit ground and left it
+            //if ((HeroControllerR.dash_timer < EPS) || (dashDir.y > EPS)) // first time entering dash or going up
+            //    { HeroControllerR.rb2d.velocity = dashDir; }
+            if (HeroControllerR.dash_timer < EPS) { contactedGroundDuringDash = false; } //first time entered dash
+            if (HeroControllerR.cState.onGround) {  contactedGroundDuringDash = true; }
+            if ((!HeroControllerR.cState.onGround) && (dashDir.y < -EPS) && (contactedGroundDuringDash)) //diagonal dash hit ground and left it
             {
                 Vector2 lastVel = HeroControllerR.rb2d.velocity;
                 HeroControllerR.FinishedDashing();
-                HeroControllerR.rb2d.velocity = lastVel;
+                HeroControllerR.rb2d.velocity = new Vector2 (lastVel.x, 0f);
                 return;
             }
+            HeroControllerR.rb2d.velocity = dashDir;
+            //if ((dashDir.y < -EPS) && (Math.Abs(HeroControllerR.rb2d.velocity.x) < EPS)) // diagonal down dash hits wall
+            //{
+            //    HeroControllerR.FinishedDashing();
+            //}
             if (HeroControllerR.cState.onGround)
             {
                 isDashJumpExtended = true;
-                if (dashDir.y < -0.001f)
+                if ((dashDir.y < -0.001f) && (HeroControllerR.dash_timer < EPS))
                 {
-
                     HeroControllerR.rb2d.velocity = new Vector2(dashDir.x, 0f);// * (float)Math.Sqrt(2), 0f);
                 }
             }
@@ -480,7 +505,7 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
                     lastVel.y = 0f;
                     inHyper = true;
                 }
-                if (Math.Abs(dashDir.y) < EPS)
+                if ((Math.Abs(dashDir.y) < EPS) && (HeroControllerR.cState.dashing))
                 {
                     lastVel.x = maxDashSpeed * Math.Sign(dashDir.x);
                 }
@@ -490,7 +515,7 @@ private void CCancelRecoulHz(On.HeroController.orig_CancelRecoilHorizontal orig,
                 } else if (HeroControllerR.cState.dashing)
                 {
                     HeroControllerR.airDashed = false;
-                    PlayerDataAccess.canDash = true;
+                    //PlayerDataAccess.canDash = true;
                     HeroControllerR.doubleJumped = false;
                 }
                 canExceedSpeed = true;
